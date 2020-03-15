@@ -8,6 +8,13 @@ set title: "Pan and Zoom", width: 1028, height: 768
 @scale = Vector.new([1.0,1.0])
 @rot = 0.0
 
+def text_box(text, options)
+  text.each do |line|
+    Text.new line, options
+    options[:y] += 18
+  end
+end
+
 def world_to_screen(world)
   Vector.new [
     @offset.x + world.x * @scale.x * Math.cos(@rot) - world.y * @scale.y * Math.sin(@rot),
@@ -43,6 +50,7 @@ end
 
 update do
   clear
+  text_box(["Instructions", "Press w to zoom in", "Press s to zoom out", "Press a to rotate ccw", "Press d to rotate cw", "Click or drag to move grid"], x: 750, y: 50, color: 'white')
   if @dragging
     @offset.x = get :mouse_x
     @offset.y = get :mouse_y
