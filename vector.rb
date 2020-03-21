@@ -1,9 +1,11 @@
 # Simple 3d vector (can be used as a point, vel or acc)
 class Vector
   attr_accessor :x, :y, :z
-  def initialize(coords)
-    if coords.is_a? Vector
-      @x, @y, @z = coords.x, coords.y, coords.z
+  def initialize(*coords)
+    coords.flatten!
+    if coords.first.is_a? Vector
+      vec = coords.first
+      @x, @y, @z = vec.x, vec.y, vec.z
     else
       @x, @y, @z = coords
     end
