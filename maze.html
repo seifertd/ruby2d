@@ -1,0 +1,126 @@
+<html>
+  <head>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.0.0/lib/p5.min.js"></script>
+  </head>
+  <style>
+html, body {
+  margin: 0;
+  padding: 0;
+}
+  </style>
+  <body>
+    <h1>2D Maze</h1>
+  </body>
+  <script>
+    Array.prototype.sample = function(){
+      return this[Math.floor(Math.random()*this.length)];
+    }
+    const createGrid = (width, height) => {
+      let m = [];
+      for(let i = 0; i < width; i++) {
+        if (m[i] === undefined) {
+          m[i] = [];
+        }
+        for (let j = 0; j < height; j++) {
+          m[i].push(0);
+        }
+      }
+      return m;
+    };
+    const initMaze = (width, height) => {
+      let cell_size = 18;
+      let border_size = 6;
+      let grid_size = cell_size + border_size;
+      let maze = createGrid(width, height)
+      let stack = [[0,0]];
+      let total_visited = 1;
+      const NORTH = 1, SOUTH = 2, EAST = 4, WEST = 8, VISITED = 16, DONE = 32;
+      maze[0][0] |= VISITED;
+      return {
+        toScreen: (coord) => {
+          return border_size + coord * grid_size;
+        },
+        drawMaze: () => {
+          fill(color(255, 255, 255));
+          noStroke();
+          for(let x = 0; x < width; x++) {
+            for(let y = 0; y < height; y++) {
+              square(game.toScreen(x), game.toScreen(y), cell_size);
+              if (x < (width - 1) && maze[x][y] & EAST) {
+                rect(game.toScreen(x) + cell_size, game.toScreen(y),
+                  border_size, cell_size);
+              }
+              if (y < (height - 1) && maze[x][y] & SOUTH) {
+                rect(game.toScreen(x), game.toScreen(y) + cell_size,
+                  cell_size, border_size);
+              }
+            }
+          }
+          const current = stack[0];
+          const cX = current[0];
+          const cY = current[1];
+          fill(color('blue'));
+          square(game.toScreen(cX), game.toScreen(cY), cell_size);
+
+          if (total_visited < (width * height)) {
+            let cells = [];
+            if (!(maze[cX][cY] & DONE)) {
+              if (cX > 0 && !(maze[cX-1][cY] & VISITED)) {
+                cells.push([cX-1, cY, WEST]);
+              }
+              if (cX < width - 1 && !(maze[cX+1][cY] & VISITED)) {
+                cells.push([cX+1, cY, EAST]);
+              }
+              if (cY > 0 && !(maze[cX][cY-1] & VISITED)) {
+                cells.push([cX, cY-1, NORTH]);
+              }
+              if (cY < height - 1 && !(maze[cX][cY+1] & VISITED)) {
+                cells.push([cX, cY+1, SOUTH]);
+              }
+            }
+            if (cells.length > 0) {
+              nextCell = cells.sample();
+              nX = nextCell[0];
+              nY = nextCell[1];
+              nD = nextCell[2];
+              switch (nD) {
+                case EAST:
+                  maze[nX][nY] |= WEST;
+                  maze[cX][cY] |= EAST;
+                  break;
+                case WEST:
+                  maze[nX][nY] |= EAST;
+                  maze[cX][cY] |= WEST;
+                  break;
+                case NORTH:
+                  maze[nX][nY] |= SOUTH;
+                  maze[cX][cY] |= NORTH;
+                  break;
+                case SOUTH:
+                  maze[nX][nY] |= NORTH;
+                  maze[cX][cY] |= SOUTH;
+                  break;
+              }
+              maze[nX][nY] |= VISITED;
+              stack.unshift(nextCell);
+              total_visited += 1;
+            } else {
+              maze[cX][cY] |= DONE;
+              stack.shift();
+            }
+          } else {
+            noLoop();
+          }
+        }
+      };
+    };
+    let game = initMaze(40, 25);
+    function setup() {
+      createCanvas(game.toScreen(40), game.toScreen(25));
+    }
+    function draw() {
+      background(100);
+      game.drawMaze();
+  }
+  </script>
+</html>

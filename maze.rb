@@ -12,8 +12,8 @@ DONE = 32
 @cell_size = 18
 @border_size = 6
 @grid_size = @cell_size + @border_size
-@height = 32
-@width = 32
+@height = 25
+@width = 40
 
 @maze = Array.new(@width) { Array.new(@height) { 0 } }
 @stack = [Vector.new(0,0)]
