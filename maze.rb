@@ -49,13 +49,12 @@ update do
       end
     end
   end
-
   # Draw top of stack
   Square.new(x: screen_coord(@stack[0].x), y: screen_coord(@stack[0].y),
     size: @cell_size, color: 'blue', z: 10)
 
   # Run algo
-  10.times do
+  1.times do
     if @total_visited < (@width * @height)
       cells = []
       current = @stack[0]
