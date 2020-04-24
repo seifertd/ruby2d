@@ -46,6 +46,8 @@ class Body
 end
 
 class Orbits < Gosu::Window
+  # seconds per tick
+  SPT = 10
   CIRCLE_STEP = 10
   G = 6.674e-11
   # meters per pixel
@@ -83,29 +85,31 @@ class Orbits < Gosu::Window
   # Assumption: each tick is 1 second. To scale this up to, say, earth - sun - moon, we would need to integrate
   # the equations of motion
   def update
-    start = Time.new
     return unless @running
-    @bodies.each do |body|
-      # Acceleration due to center
-      d = Math.sqrt((body.pos.x - @center.pos.x)**2 + (body.pos.y - @center.pos.y)**2)
-      # unit acc_vect along line connecting centers
-      acc_vect = Vector.new((@center.pos.x - body.pos.x) / d, (@center.pos.y - body.pos.y) / d)
-      # Calculate acceration of body in pixels per second
-      body.g = acc_vect * (G * @center.mass / (d*d*MPP*MPP) / MPP)
-      #puts "G: #{body.g.x.round(3)},#{body.g.y.round(3)} V: #{body.vel.x.round(3)},#{body.vel.y.round(3)} B:#{body.pos.x.round(3)},#{body.pos.y.round(3)} S:#{@center.pos.x},#{@center.pos.y}"
+    start = Time.new
+    SPT.times do
+      @bodies.each do |body|
+        # Acceleration due to center
+        d = Math.sqrt((body.pos.x - @center.pos.x)**2 + (body.pos.y - @center.pos.y)**2)
+        # unit acc_vect along line connecting centers
+        acc_vect = Vector.new((@center.pos.x - body.pos.x) / d, (@center.pos.y - body.pos.y) / d)
+        # Calculate acceration of body in pixels per second
+        body.g = acc_vect * (G * @center.mass / (d*d*MPP*MPP) / MPP)
+        #puts "G: #{body.g.x.round(3)},#{body.g.y.round(3)} V: #{body.vel.x.round(3)},#{body.vel.y.round(3)} B:#{body.pos.x.round(3)},#{body.pos.y.round(3)} S:#{@center.pos.x},#{@center.pos.y}"
 
-      body.vel.x += body.g.x
-      body.vel.y += body.g.y
+        body.vel.x += body.g.x
+        body.vel.y += body.g.y
 
-      body.pos.x += body.vel.x
-      body.pos.y += body.vel.y
+        body.pos.x += body.vel.x
+        body.pos.y += body.vel.y
 
-      @bodies.each do |body2|
-        if body.collides?(body2)
-          body.collide_with(body2)
-        end
-        if body.collides?(@center)
-          @running = false
+        @bodies.each do |body2|
+          if body.collides?(body2)
+            body.collide_with(body2)
+          end
+          if body.collides?(@center)
+            @running = false
+          end
         end
       end
     end
