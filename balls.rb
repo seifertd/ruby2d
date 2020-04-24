@@ -2,10 +2,10 @@ require 'gosu'
 require_relative './vector'
 
 class Ball
-  attr_reader :pos, :vel, :radius
+  attr_reader :pos, :vel, :radius, :mass
   def initialize(x, y, r, vx, vy)
     @pos = Vector.new(x, y)
-    @radius = r 
+    @radius = @mass = r 
     @vel = Vector.new(vx, vy)
   end
 
@@ -24,15 +24,22 @@ class Ball
     nx = (ball.pos.x - self.pos.x) / d
     ny = (ball.pos.y - self.pos.y) / d
 
-    p = nx * self.vel.x + ny * self.vel.y
+    kx = self.vel.x - ball.vel.x
+    ky = self.vel.y - ball.vel.y
+    
+    p = 2.0 * (nx * kx + ny * ky) / ( self.mass + ball.mass )
 
-    self.vel.x -= p * nx * 1.9
-    self.vel.y -= p * ny * 1.9
+    self.vel.x -= p * ball.mass * nx * 0.95
+    self.vel.y -= p * ball.mass * ny * 0.95
+    ball.vel.x += p * self.mass * nx * 0.95
+    ball.vel.y += p * self.mass * ny * 0.95
 
     # Displace ball away from g to account for possible overlap
-    overlap = (d - self.radius - ball.radius)
+    overlap = (d - self.radius - ball.radius) * 0.5
     self.pos.x -= overlap * (self.pos.x - ball.pos.x) / d
     self.pos.y -= overlap * (self.pos.y - ball.pos.y) / d
+    ball.pos.x += overlap * (self.pos.x - ball.pos.x) / d
+    ball.pos.y += overlap * (self.pos.y - ball.pos.y) / d
   end
 end
 
@@ -44,10 +51,10 @@ class Ballz < Gosu::Window
     @width = width
     @height = height
     @balls = [
-      Ball.new(10,10,20,-3.2,2.2)
+      Ball.new(10, 10, 20, -5 + rand(10), -5 + rand(10))
     ]
     20.times do 
-      @balls << Ball.new(rand(width), rand(height), 5 + rand(10), 0, 0)
+      @balls << Ball.new(rand(width), rand(height), 5 + rand(10), -5 + rand(10), -5 + rand(10))
     end
     super(width, height)
     self.caption = "Ballz!"
@@ -74,6 +81,12 @@ class Ballz < Gosu::Window
         ball.pos.y = ball.radius
         ball.vel.y *= -1
       end
+      if ball.vel.x.abs() < 0.001
+        ball.vel.x = 0.0
+      end
+      if ball.vel.y.abs() < 0.001
+        ball.vel.y = 0.0
+      end
 
       @balls.each do |ball2|
         if ball.collides?(ball2)
@@ -81,7 +94,6 @@ class Ballz < Gosu::Window
         end
       end
     end
-    @balls.first.vel.y += 0.2
   end
 
   def draw
