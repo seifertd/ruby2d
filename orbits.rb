@@ -2,15 +2,14 @@ require 'gosu'
 require_relative './vector'
 
 class Body
-  attr_reader :pos, :vel, :acc, :radius, :mass, :path
-  attr_accessor :g
+  attr_reader :pos, :vel, :acc, :radius, :mass
+  attr_accessor :g, :orbit_radius
   def initialize(x, y, r, m, vx, vy)
     @pos = Vector.new(x, y)
     @radius = r 
     @mass = m
     @vel = Vector.new(vx, vy)
     @acc = Vector.new(0, 0)
-    @path = []
   end
 
   def collides?(other)
@@ -50,37 +49,50 @@ class Orbits < Gosu::Window
   CIRCLE_STEP = 10
   G = 6.674e-11
   # meters per pixel
-  MPP = 5e3
+  MPP = 5e5
   attr_reader :bodies, :width, :height
 
   def initialize(width, height)
     @width = width
     @height = height
     @running = true
-    @sun = Body.new(width / 2, height / 2, 20, 5e25, 0, 0)
+    #@center = Body.new(width / 2, height / 2, 20, 5e26, 0, 0)
+    # EARTH: 
+    @center = Body.new(width / 2, height / 2, 20, 5e26, 0, 0)
     @bodies = []
-    3.times do |i|
+    4.times do |i|
       x = 50 + i * 100
-      d = @sun.pos.x - x
-      vel = Math.sqrt(G * @sun.mass / (d * MPP)) / MPP
-      period = Math.sqrt(4 * 3.14159 * (d * MPP)**3 / G / @sun.mass)
+      if i == 3
+        x = 300
+      end
+      d = @center.pos.x - x
+      vel = Math.sqrt(G * @center.mass / (d * MPP)) / MPP
+      period = Math.sqrt(4 * 3.14159 * (d * MPP)**3 / G / @center.mass)
       puts "BODY: #{i}: vel: #{vel.round(3)} period: #{period.round(3)} distance: #{d * MPP/ 1000} km"
+      if i == 3
+        # let's turn this one elliptical
+        vel = vel * 0.7
+      end
       @bodies <<  Body.new(x, height / 2,  3, 1e5, 0, vel)
+      @bodies.last.orbit_radius = d
     end
     super(width, height)
     self.caption = "Orbits"
   end
 
+  # Assumption: each tick is 1 second. To scale this up to, say, earth - sun - moon, we would need to integrate
+  # the equations of motion
   def update
+    start = Time.new
     return unless @running
     @bodies.each do |body|
-      # Acceleration due to sun
-      d = Math.sqrt((body.pos.x - @sun.pos.x)**2 + (body.pos.y - @sun.pos.y)**2)
-      # unit normal along line connecting centers
-      normal = Vector.new((@sun.pos.x - body.pos.x) / d, (@sun.pos.y - body.pos.y) / d)
-      # Calculate acceration of body in pixels per scond
-      body.g = normal * (G * @sun.mass / (d*d*MPP*MPP) / MPP)
-      #puts "G: #{body.g.x.round(3)},#{body.g.y.round(3)} V: #{body.vel.x.round(3)},#{body.vel.y.round(3)} B:#{body.pos.x.round(3)},#{body.pos.y.round(3)} S:#{@sun.pos.x},#{@sun.pos.y}"
+      # Acceleration due to center
+      d = Math.sqrt((body.pos.x - @center.pos.x)**2 + (body.pos.y - @center.pos.y)**2)
+      # unit acc_vect along line connecting centers
+      acc_vect = Vector.new((@center.pos.x - body.pos.x) / d, (@center.pos.y - body.pos.y) / d)
+      # Calculate acceration of body in pixels per second
+      body.g = acc_vect * (G * @center.mass / (d*d*MPP*MPP) / MPP)
+      #puts "G: #{body.g.x.round(3)},#{body.g.y.round(3)} V: #{body.vel.x.round(3)},#{body.vel.y.round(3)} B:#{body.pos.x.round(3)},#{body.pos.y.round(3)} S:#{@center.pos.x},#{@center.pos.y}"
 
       body.vel.x += body.g.x
       body.vel.y += body.g.y
@@ -88,41 +100,17 @@ class Orbits < Gosu::Window
       body.pos.x += body.vel.x
       body.pos.y += body.vel.y
 
-      body.path << Vector.new(body.pos)
-      if body.path.length > 20
-        body.path.shift
-      end
-
       @bodies.each do |body2|
         if body.collides?(body2)
           body.collide_with(body2)
         end
-        if body.collides?(@sun)
+        if body.collides?(@center)
           @running = false
         end
       end
-
-=begin
-      if body.pos.x > (self.width - body.radius)
-        @running = false
-      end
-      if body.pos.x < body.radius
-        @running = false
-      end
-      if body.pos.y > (self.height - body.radius)
-        @running = false
-      end
-      if body.pos.y < body.radius
-        @running = false
-      end
-      if body.vel.x.abs() < 0.001
-        body.vel.x = 0.0
-      end
-      if body.vel.y.abs() < 0.001
-        body.vel.y = 0.0
-      end
-=end
     end
+    stop = Time.new
+    #puts "UPDATE TOOK #{(stop.to_f - start.to_f) * 1000.0} ms"
   end
 
   def button_down(id)
@@ -132,16 +120,14 @@ class Orbits < Gosu::Window
   end
 
   def draw
-    draw_circle(@sun.pos.x, @sun.pos.y, @sun.radius, Gosu::Color::WHITE)
-    draw_circle(@sun.pos.x, @sun.pos.y, 3, Gosu::Color::WHITE,36)
+    draw_circle(@center.pos.x, @center.pos.y, @center.radius, Gosu::Color::WHITE)
+    draw_circle(@center.pos.x, @center.pos.y, 3, Gosu::Color::WHITE,36)
     @bodies.each do |body|
       draw_circle(body.pos.x, body.pos.y, body.radius, Gosu::Color::WHITE)
       theta = Math.atan2(body.g.y, body.g.x)
       endc = Vector.new body.pos.x + 30 * Math.cos(theta), body.pos.y + 30 * Math.sin(theta)
-      draw_line(body.pos.x, body.pos.y, Gosu::Color::WHITE, endc.x, endc.y, Gosu::Color::WHITE)
-      body.path.each do |path|
-        draw_circle(path.x, path.y, 1, Gosu::Color::WHITE,90)
-      end
+      draw_line(body.pos.x, body.pos.y, Gosu::Color::GREEN, endc.x, endc.y, Gosu::Color::GREEN)
+      draw_circle(@center.pos.x, @center.pos.y, body.orbit_radius, Gosu::Color::BLUE)
     end
   end
 
