@@ -8,7 +8,7 @@ class Body
   attr_accessor :g
   def initialize(x, y, r, m, vx, vy)
     @pos = Vector.new(x, y)
-    @radius = r 
+    @radius = r
     @mass = m
     @vel = Vector.new(vx, vy)
     @acc = Vector.new(0, 0)
@@ -51,53 +51,29 @@ class NBody < Gosu::Window
     @width = width
     @height = height
     @running = true
-    @pin_largest = false
+    @pin_largest = true
     @display = false
-    @scale = 1.0
+    @scale = 0.1
+    @elapsed = 0
     # seconds per tick
-    @spt = 10
+    @spt = 50
     @bodies = [
-      Body.new(width / 2, height / 2, 20, 5e26, 0, 0)
+      Body.new(width / 2, height / 2, 30, 5e28, 0, 0)
     ]
     center = @bodies.first
-    4.times do |i|
-      x = 50 + i * 100
-      mass = 5e25
-      radius = 7
-      if i == 3
-        x = 300
-        mass = 5e24
-        radius = 10
-      end
-      d = center.pos.x - x
-      vel = Math.sqrt(G * center.mass / (d * MPP)) / MPP
-      period = Math.sqrt(4 * PI * (d * MPP)**3 / G / center.mass)
-      puts "BODY: #{i}: vel: #{vel.round(3)} period: #{period.round(3)} distance: #{d * MPP/ 1000} km"
-      if i == 3
-        # let's turn this one elliptical
-        vel = vel * 0.7
-      end
-      @bodies <<  Body.new(x, height / 2,  radius, mass, 0, vel)
-    end
-    3.times do |i|
-      x = 750 - i * 100
-      mass = 5e25
-      radius = 7
-      d = x - center.pos.x
-      vel = Math.sqrt(G * center.mass / (d * MPP)) / MPP
-      period = Math.sqrt(4 * PI * (d * MPP)**3 / G / center.mass)
-      vel = vel * (-1.0 + 2 * rand())
-      puts "BODY: #{i}: vel: #{vel.round(3)} period: #{period.round(3)} distance: #{d * MPP/ 1000} km"
-      @bodies <<  Body.new(x, height / 2,  radius, mass, 0, vel)
-    end
-    10.times do |i|
-      @bodies <<  Body.new(rand(@width), rand(@height), 2 + rand(20), 1e25 + 1e24*rand(), rand() / 10.0, rand() / 10.0)
+    50.times do |i|
+      x = rand(@width)
+      y = rand(@height)
+      r = Vector.new(@width/2.0 - x, @height/2.0 - y)
+      circular_orbit_vel =  Math.sqrt(G * center.mass / (r.magnitude * MPP)) / MPP
+      vel = r.unit.normal * circular_orbit_vel
+      @bodies <<  Body.new(rand(@width), rand(@height), 2 + rand(5), 1e21 + 1e20*rand(), vel.x, vel.y)
       body = @bodies.last
       puts "BODY: #{i}: vel: #{body.vel.x.round(3)},#{body.vel.y.round(3)} pos: #{body.pos.x},#{body.pos.y}"
     end
     super(width, height)
     @font = Gosu::Font.new(self, Gosu::default_font_name, 20)
-    self.caption = "Orbits"
+    self.caption = "N-Body Problem"
   end
 
   # Assumption: each tick is 1 second. To scale this up to, say, earth - sun - moon, we would need to integrate
@@ -106,9 +82,11 @@ class NBody < Gosu::Window
     return unless @running
     start = Time.new
     @spt.times do
+      @elapsed += 1
       @bodies.each do |body|
         body.g = Vector.new(0,0)
       end
+      bc = barycenter
       @bodies.each do |body|
         @bodies.each do |body2|
           next if body2 == body
@@ -138,28 +116,29 @@ class NBody < Gosu::Window
           @bodies.delete(body2)
           @bodies << body1.collide_with(body2)
         end
-        #if body.pos.x > (@width * 4) || body.pos.x < -(@width * 3) || body.pos.y > (@height * 4) || body.pos.y < -(@height * 3)
-        #  @bodies.delete(body)
-        #  puts "REMOVE: vel: #{body.vel.x.round(3)},#{body.vel.y.round(3)} pos: #{body.pos.x},#{body.pos.y}"
-        #end
+        if body.pos.x > bc.x + 10000 || body.pos.x < bc.x - 10000 ||
+           body.pos.y > bc.y + 10000 || body.pos.x < bc.y - 10000
+          @bodies.delete(body)
+          puts "REMOVE: vel: #{body.vel.x.round(3)},#{body.vel.y.round(3)} pos: #{body.pos.x},#{body.pos.y}"
+        end
       end
     end
     if @pin_largest
-      big = @bodies.max_by(&:radius)
-      if big
-        dx = @width / 2.0 / @scale - big.pos.x
-        dy = @height / 2.0 / @scale - big.pos.y
-        @bodies.each do |body|
-          body.pos.x += dx
-          body.pos.y += dy
-        end
+      pos = barycenter
+      dx = @width / 2.0 / @scale - pos.x
+      dy = @height / 2.0 / @scale - pos.y
+      @bodies.each do |body|
+        body.pos.x += dx
+        body.pos.y += dy
       end
     end
     if @bodies.size <= 1
       @running = false
     end
     stop = Time.new
-    #puts "UPDATE TOOK #{(stop.to_f - start.to_f) * 1000.0} ms"
+    if (delta_t = stop.to_f - start.to_f) > 1.0
+      puts "WARN: TICK TOOK #{((stop.to_f - start.to_f) * 1000.0).round(1)} ms"
+    end
   end
 
   def button_down(id)
@@ -207,6 +186,20 @@ class NBody < Gosu::Window
     end.sum
   end
 
+  def barycenter
+    if @bodies.size
+      total_mass = 0
+      weighted_pos = Vector.new(0,0)
+      @bodies.each do |body|
+        total_mass += body.mass
+        weighted_pos += (body.pos * body.mass)
+      end
+      weighted_pos / total_mass
+    else
+      Vector.new(@width / 2, @height / 2)
+    end
+  end
+
   def draw
     @bodies.each do |body|
       draw_circle(body.pos.x * @scale, body.pos.y * @scale, body.radius * @scale, Gosu::Color::WHITE)
@@ -215,11 +208,19 @@ class NBody < Gosu::Window
       @font.draw_text("N: #{@bodies.size}", 600, 20, 1)
       @font.draw_text("T: #{@spt}", 600, 45, 1)
       @font.draw_text("S: #{@scale.round(1)}", 600, 70, 1)
+      @font.draw_text("E: #{elapsed}", 600, 95, 1)
     end
   end
 
+  def elapsed
+    h = @elapsed / 3600
+    m = (@elapsed % 3600) / 60
+    s = @elapsed % 60
+    "%02d:%02d:%02d" % [h,m,s]
+  end
+
   private
-  def draw_circle(cx,cy,r,color,step = CIRCLE_STEP)      
+  def draw_circle(cx,cy,r,color,step = CIRCLE_STEP)
     0.step(360, step) do |a1|
       a2 = a1 + step
       draw_line cx + Gosu.offset_x(a1, r), cy + Gosu.offset_y(a1, r), color, cx + Gosu.offset_x(a2, r), cy + Gosu.offset_y(a2, r), color, 9999

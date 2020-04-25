@@ -10,6 +10,17 @@ class Vector
       @x, @y, @z = coords
     end
   end
+  def magnitude
+    Math.sqrt((@x || 0) ** 2 + (@y || 0) ** 2 + (@z || 0) ** 2)
+  end
+  def unit
+    mag = self.magnitude
+    u = Vector.new((@x || 0) / mag, (@y || 0) / mag)
+    if @z
+      u.z = @z / mag
+    end
+    u
+  end
   def normal
     Vector.new([-@y, @x])
   end
