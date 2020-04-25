@@ -51,12 +51,12 @@ class NBody < Gosu::Window
     @width = width
     @height = height
     @running = true
-    @pin_largest = true
-    @display = false
+    @pin_barycenter = true
+    @display = true
     @scale = 0.1
     @elapsed = 0
     # seconds per tick
-    @spt = 50
+    @spt = 60
     @bodies = [
       Body.new(width / 2, height / 2, 30, 5e28, 0, 0)
     ]
@@ -83,11 +83,9 @@ class NBody < Gosu::Window
     start = Time.new
     @spt.times do
       @elapsed += 1
-      @bodies.each do |body|
-        body.g = Vector.new(0,0)
-      end
       bc = barycenter
       @bodies.each do |body|
+        body.g = Vector.new(0,0)
         @bodies.each do |body2|
           next if body2 == body
           # Accel of body2 on body
@@ -123,7 +121,7 @@ class NBody < Gosu::Window
         end
       end
     end
-    if @pin_largest
+    if @pin_barycenter
       pos = barycenter
       dx = @width / 2.0 / @scale - pos.x
       dy = @height / 2.0 / @scale - pos.y
@@ -161,7 +159,7 @@ class NBody < Gosu::Window
         body.pos.x += 10
       end
     elsif id == Gosu::KbC
-      @pin_largest = !@pin_largest
+      @pin_barycenter = !@pin_barycenter
     elsif id == Gosu::KbI
       @display = !@display
     elsif id == Gosu::KbT
