@@ -41,8 +41,6 @@ class Body
 end
 
 class NBody < Gosu::Window
-  # seconds per tick
-  SPT = 10
   CIRCLE_STEP = 10
   G = 6.674e-11
   # meters per pixel
@@ -56,6 +54,8 @@ class NBody < Gosu::Window
     @pin_largest = false
     @display = false
     @scale = 1.0
+    # seconds per tick
+    @spt = 10
     @bodies = [
       Body.new(width / 2, height / 2, 20, 5e26, 0, 0)
     ]
@@ -105,7 +105,7 @@ class NBody < Gosu::Window
   def update
     return unless @running
     start = Time.new
-    SPT.times do
+    @spt.times do
       @bodies.each do |body|
         body.g = Vector.new(0,0)
       end
@@ -191,6 +191,12 @@ class NBody < Gosu::Window
       end
     elsif id == Gosu::KbG
       @scale += 0.1
+    elsif id == Gosu::KbO
+      @spt += 1
+    elsif id == Gosu::KbL
+      if @spt > 2
+        @spt -= 1
+      end
     end
 
   end
@@ -207,7 +213,7 @@ class NBody < Gosu::Window
     end
     if @display
       @font.draw_text("N: #{@bodies.size}", 600, 20, 1)
-      #@font.draw_text("E: #{energy.round(3)}", 600, 45, 1)
+      @font.draw_text("T: #{@spt}", 600, 45, 1)
       @font.draw_text("S: #{@scale.round(1)}", 600, 70, 1)
     end
   end
