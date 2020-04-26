@@ -24,6 +24,14 @@ class Vector
   def normal
     Vector.new([-@y, @x])
   end
+  def add!(other)
+    @x = (@x || 0) + (other.x || 0)
+    @y = (@y || 0) + (other.y || 0)
+    if @z
+      @z = @z + (other.z || 0)
+    end
+    self
+  end
   def +(other)
     coords = []
     coords << (@x || 0) + (other.x || 0)

@@ -4,15 +4,13 @@ require_relative './vector'
 PI = 3.14159
 
 class Body
-  attr_reader :pos, :vel, :acc, :radius, :mass
-  attr_accessor :g
+  attr_accessor :pos, :vel, :acc, :radius, :mass
   def initialize(x, y, r, m, vx, vy)
     @pos = Vector.new(x, y)
     @radius = r
     @mass = m
     @vel = Vector.new(vx, vy)
     @acc = Vector.new(0, 0)
-    @g = Vector.new(0,0)
   end
 
   def collides?(other)
@@ -35,7 +33,7 @@ class Body
     nr = (biggest.radius ** 3 + smallest.radius ** 3 ) ** (1.0 / 3.0)
     vnx = (biggest.mass * biggest.vel.x + smallest.mass * smallest.vel.x) / ( biggest.mass + smallest.mass )
     vny = (biggest.mass * biggest.vel.y + smallest.mass * smallest.vel.y) / ( biggest.mass + smallest.mass )
-    puts "NEW: r=#{nr} m=#{biggest.mass + smallest.mass} vx=#{vnx} vy=#{vny}"
+    puts "COLLISION! r=#{nr.round(3)} m=#{"%.3e" % (biggest.mass + smallest.mass)} vx=#{vnx.round(3)} vy=#{vny.round(3)}"
     Body.new(biggest.pos.x, biggest.pos.y, nr, biggest.mass + smallest.mass, vnx, vny)
   end
 end
@@ -61,19 +59,72 @@ class NBody < Gosu::Window
       Body.new(width / 2, height / 2, 30, 5e28, 0, 0)
     ]
     center = @bodies.first
-    50.times do |i|
-      x = rand(@width)
-      y = rand(@height)
-      r = Vector.new(@width/2.0 - x, @height/2.0 - y)
-      circular_orbit_vel =  Math.sqrt(G * center.mass / (r.magnitude * MPP)) / MPP
-      vel = r.unit.normal * circular_orbit_vel
-      @bodies <<  Body.new(rand(@width), rand(@height), 2 + rand(5), 1e21 + 1e20*rand(), vel.x, vel.y)
-      body = @bodies.last
-      puts "BODY: #{i}: vel: #{body.vel.x.round(3)},#{body.vel.y.round(3)} pos: #{body.pos.x},#{body.pos.y}"
-    end
+    random_gen(30, 1.0, true)
+    #random_with_moons(5,3)
     super(width, height)
     @font = Gosu::Font.new(self, Gosu::default_font_name, 20)
     self.caption = "N-Body Problem"
+  end
+
+  def needs_cursor?
+    true
+  end
+
+  def random_with_moons(n, m)
+    @scale = 0.2
+    center = @bodies.first
+    n.times do |i|
+      x = -@width * 3 +  rand(@width * 6)
+      y = -@height * 3 + rand(@height * 6)
+      r = Vector.new(@width/2.0 - x, @height/2.0 - y)
+      circular_orbit_vel =  Math.sqrt(G * center.mass / (r.magnitude * MPP)) / MPP
+      vel = r.unit.normal * circular_orbit_vel
+      mass = rand() * 1e26
+      radius = 8 + rand(8)
+      @bodies <<  Body.new(x, y, radius, mass, vel.x, vel.y)
+      body = @bodies.last
+      puts "BODY: #{i}: m:#{"%.3e" % body.mass} vel:#{body.vel.x.round(3)},#{body.vel.y.round(3)} pos:#{body.pos.x},#{body.pos.y}"
+
+      m.times do |j|
+        #moon
+        d = radius + 10 + rand(50)
+        # moon unit normal
+        moon_orbit_vel = Math.sqrt(G * mass / (d*MPP)) / MPP
+        sign = j == 1 ? 1 : -1
+        moon_un = Vector.new(0, sign)
+        moon_vel = vel + (moon_un * moon_orbit_vel)
+        moon_mass = 1e7 * rand()
+        moon_radius = 1 + rand(4)
+        @bodies <<  Body.new(x - sign * d, y, moon_radius, moon_mass, moon_vel.x, moon_vel.y)
+        body = @bodies.last
+        puts "MOON: #{i}: m:#{"%.3e" % body.mass} vel:#{body.vel.x.round(3)},#{body.vel.y.round(3)} pos:#{body.pos.x},#{body.pos.y}"
+      end
+    end
+  end
+
+  def random_gen(n, pf = 0.2, dense = true)
+    @scale = 0.3
+    center = @bodies.first
+    n.times do |i|
+      if dense
+        x = rand(@width)
+        y = rand(@height)
+      else
+        x = -@width  + rand(@width * 3)
+        y = -@height + rand(@height * 3)
+      end
+      r = Vector.new(@width/2.0 - x, @height/2.0 - y)
+      circular_orbit_vel =  Math.sqrt(G * center.mass / (r.magnitude * MPP)) / MPP
+      vel = r.unit.normal * circular_orbit_vel
+      # Perturb just a tad
+      vel.x = vel.x * (1.0 - (pf/2.0) + rand() * pf)
+      vel.y = vel.y * (1.0 - (pf/2.0) + rand() * pf)
+      base_mass = i < (n/2) ? 1e22 : 1e7
+      base_radius = i < (n/2) ? 10 : 4
+      @bodies <<  Body.new(x, y, 1 + rand(base_radius), base_mass * rand(), vel.x, vel.y)
+      body = @bodies.last
+      puts "BODY: #{i}: m:#{"%.3e" % body.mass} vel:#{body.vel.x.round(3)},#{body.vel.y.round(3)} pos:#{body.pos.x},#{body.pos.y}"
+    end
   end
 
   # Assumption: each tick is 1 second. To scale this up to, say, earth - sun - moon, we would need to integrate
@@ -85,21 +136,20 @@ class NBody < Gosu::Window
       @elapsed += 1
       bc = barycenter
       @bodies.each do |body|
-        body.g = Vector.new(0,0)
+        body.acc.x = body.acc.y = 0
         @bodies.each do |body2|
           next if body2 == body
           # Accel of body2 on body
           d = Math.sqrt((body.pos.x - body2.pos.x)**2 + (body.pos.y - body2.pos.y)**2)
           acc_vect = Vector.new((body2.pos.x - body.pos.x) / d, (body2.pos.y - body.pos.y) / d)
-          body.g += acc_vect * (G * body2.mass / (d*d*MPP*MPP) / MPP)
+          acc_vect = Vector.new((body2.pos.x - body.pos.x) / d, (body2.pos.y - body.pos.y) / d)
+          body.acc.add! (acc_vect * (G * body2.mass / (d*d*MPP*MPP) / MPP))
         end
       end
       @bodies.each do |body|
-        body.vel.x += body.g.x
-        body.vel.y += body.g.y
+        body.vel.add! body.acc
 
-        body.pos.x += body.vel.x
-        body.pos.y += body.vel.y
+        body.pos.add! body.vel
 
         colliding = []
         @bodies.each do |body2|
@@ -117,7 +167,7 @@ class NBody < Gosu::Window
         if body.pos.x > bc.x + 10000 || body.pos.x < bc.x - 10000 ||
            body.pos.y > bc.y + 10000 || body.pos.x < bc.y - 10000
           @bodies.delete(body)
-          puts "REMOVE: vel: #{body.vel.x.round(3)},#{body.vel.y.round(3)} pos: #{body.pos.x},#{body.pos.y}"
+          puts "REMOVE: vel: #{body.vel.x.round(3)},#{body.vel.y.round(3)} pos: #{body.pos.x.round(3)},#{body.pos.y.round(3)}"
         end
       end
     end
@@ -211,10 +261,11 @@ class NBody < Gosu::Window
   end
 
   def elapsed
-    h = @elapsed / 3600
+    d = @elapsed / (3600 * 24)
+    h = (@elapsed % (3600 * 24)) / 3600
     m = (@elapsed % 3600) / 60
     s = @elapsed % 60
-    "%02d:%02d:%02d" % [h,m,s]
+    "%dd %02dh%02dm%02ds" % [d,h,m,s]
   end
 
   private
