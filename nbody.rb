@@ -50,10 +50,12 @@ class NBody < Gosu::Window
   # meters per pixel
   MPP = 5e5
   attr_reader :bodies, :width, :height
+  attr_accessor :energy
 
   def initialize(width, height)
     @width = width
     @height = height
+    @energy = 0
     @running = true
     @pin_barycenter = false
     @pin_planet = nil
@@ -149,10 +151,16 @@ class NBody < Gosu::Window
     @spt.times do
       @elapsed += 1
       bc = barycenter
+      @energy = 0
       @bodies.each do |body|
+        # Add KE
+        @energy += 0.5 * body.mass * body.vel.magnitude ** 2
         body.acc.x = body.acc.y = 0
         @bodies.each do |body2|
           next if body2 == body
+          # Add PE
+          @energy += G * body.mass * body2.mass / ( body2.pos - body.pos ).magnitude
+
           # Accel of body2 on body
           d = Math.sqrt((body.pos.x - body2.pos.x)**2 + (body.pos.y - body2.pos.y)**2)
           acc_vect = Vector.new((body2.pos.x - body.pos.x) / d, (body2.pos.y - body.pos.y) / d)
@@ -160,22 +168,20 @@ class NBody < Gosu::Window
           body.acc.add! (acc_vect * (G * body2.mass / (d*d)))
         end
       end
+      colliding = []
       @bodies.each do |body|
         body.vel.add! body.acc
-
         body.pos.add! body.vel
-
-        colliding = []
         @bodies.each do |body2|
           if body.collides?(body2)
             colliding << [body, body2]
           end
         end
-        colliding.each do |pair|
-          body1 = pair.first
-          body2 = pair.last
-          @bodies.delete(body1.collide_with(body2))
-        end
+      end
+      colliding.each do |pair|
+        body1 = pair.first
+        body2 = pair.last
+        @bodies.delete(body1.collide_with(body2))
       end
     end
     if @bodies.size <= 1
@@ -211,12 +217,6 @@ class NBody < Gosu::Window
       @display = !@display
     end
 
-  end
-
-  def energy
-    @bodies.map do |body|
-      0.5 * body.mass * Math.sqrt(body.vel.x ** 2 + body.vel.y ** 2)
-    end.sum
   end
 
   def barycenter
@@ -288,7 +288,8 @@ class NBody < Gosu::Window
       @font.draw_text("N: #{@bodies.size}", 600, 20, 1)
       @font.draw_text("T: #{@spt}", 600, 45, 1)
       @font.draw_text("S: #{@scale.round(5)}", 600, 70, 1)
-      @font.draw_text("E: #{elapsed}", 600, 95, 1)
+      @font.draw_text("t: #{elapsed}", 600, 95, 1)
+      @font.draw_text("K: #{"%.5e" % @energy}", 600, 120, 1)
     end
   end
 
