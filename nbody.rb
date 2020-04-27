@@ -4,8 +4,9 @@ require_relative './vector'
 PI = 3.14159
 
 class Body
-  attr_accessor :pos, :vel, :acc, :radius, :mass
-  def initialize(x, y, r, m, vx, vy)
+  attr_accessor :name, :pos, :vel, :acc, :radius, :mass
+  def initialize(name, x, y, r, m, vx, vy)
+    @name = name
     @pos = Vector.new(x, y)
     @radius = r
     @mass = m
@@ -33,8 +34,13 @@ class Body
     nr = (biggest.radius ** 3 + smallest.radius ** 3 ) ** (1.0 / 3.0)
     vnx = (biggest.mass * biggest.vel.x + smallest.mass * smallest.vel.x) / ( biggest.mass + smallest.mass )
     vny = (biggest.mass * biggest.vel.y + smallest.mass * smallest.vel.y) / ( biggest.mass + smallest.mass )
-    puts "COLLISION! r=#{"%.5e" % nr} m=#{"%.5e" % (biggest.mass + smallest.mass)} vx=#{"%.5e" % vnx} vy=#{"%.5e" % vny}"
-    Body.new(biggest.pos.x, biggest.pos.y, nr, biggest.mass + smallest.mass, vnx, vny)
+    puts "COLLISION! #{biggest.name}<-#{smallest.name} r=#{"%.5e" % nr} m=#{"%.5e" % (biggest.mass + smallest.mass)} vx=#{"%.5e" % vnx} vy=#{"%.5e" % vny}"
+    biggest.radius = nr
+    biggest.mass = biggest.mass + smallest.mass
+    biggest.vel.x = vnx
+    biggest.vel.y = vny
+    biggest.name = "#{biggest.name}<-#{smallest.name}"
+    smallest
   end
 end
 
@@ -50,6 +56,7 @@ class NBody < Gosu::Window
     @height = height
     @running = true
     @pin_barycenter = false
+    @pin_planet = nil
     @offset = Vector.new(@width/2, @height/2)
     @display = true
     @scale = 0.1
@@ -57,11 +64,17 @@ class NBody < Gosu::Window
     # seconds per tick
     @spt = 60
     @bodies = [
-      Body.new(0, 0, 30 * MPP, 5e28, 0, 0)
+      Body.new('Mother', 0, 0, 30 * MPP, 5e28, 0, 0)
     ]
     center = @bodies.first
-    random_gen(50, 1.0, false)
-    #random_with_moons(5,3)
+    if ARGV[0] == 'random'
+      random_gen((ARGV[1] || 50).to_i, (ARGV[2] || 1.0).to_f, ARGV[3] == 'D')
+    elsif ARGV[0] == 'moons'
+      random_with_moons((ARGV[1] || 5).to_i, (ARGV[2] || 3).to_i)
+    else
+      puts "Usage ruby #{$0} (random N PF [D] |moons M N)"
+      exit 1
+    end
     super(width, height)
     @font = Gosu::Font.new(self, Gosu::default_font_name, 20)
     self.caption = "N-Body Problem"
@@ -82,9 +95,9 @@ class NBody < Gosu::Window
       vel = r.unit.normal * circular_orbit_vel
       mass = rand() * 1e26
       radius = (8 + rand(8)) * MPP
-      @bodies <<  Body.new(x, y, radius, mass, vel.x, vel.y)
+      @bodies <<  Body.new("P#{i}", x, y, radius, mass, vel.x, vel.y)
       body = @bodies.last
-      puts "BODY: #{i}: m:#{"%.5e" % body.mass} vel:#{"%.5e" % body.vel.x},#{"%.5e" % body.vel.y} pos:#{"%.5e" % body.pos.x},#{"%.5e" % body.pos.y}"
+      puts "BODY: #{body.name}: m:#{"%.5e" % body.mass} vel:#{"%.5e" % body.vel.x},#{"%.5e" % body.vel.y} pos:#{"%.5e" % body.pos.x},#{"%.5e" % body.pos.y}"
 
       m.times do |j|
         #moon
@@ -96,9 +109,9 @@ class NBody < Gosu::Window
         moon_vel = vel + (moon_un * moon_orbit_vel)
         moon_mass = 1e7 * rand()
         moon_radius = (1 + rand(4)) * MPP
-        @bodies <<  Body.new(x - sign * d, y, moon_radius, moon_mass, moon_vel.x, moon_vel.y)
+        @bodies <<  Body.new("P#{i}M#{j}", x - sign * d, y, moon_radius, moon_mass, moon_vel.x, moon_vel.y)
         body = @bodies.last
-        puts "MOON: #{i}: m:#{"%.5e" % body.mass} vel:#{"%.5e" % body.vel.x},#{"%.5e" % body.vel.y} pos:#{"%.5e" % body.pos.x},#{"%.5e" % body.pos.y}"
+        puts "MOON: #{body.name}: m:#{"%.5e" % body.mass} vel:#{"%.5e" % body.vel.x},#{"%.5e" % body.vel.y} pos:#{"%.5e" % body.pos.x},#{"%.5e" % body.pos.y}"
       end
     end
   end
@@ -122,9 +135,9 @@ class NBody < Gosu::Window
       vel.y = vel.y * (1.0 - (pf/2.0) + rand() * pf)
       base_mass = i < (n/2) ? 1e22 : 1e7
       base_radius = i < (n/2) ? 10 : 4
-      @bodies <<  Body.new(x, y, (1 + rand(base_radius)) * MPP, base_mass * rand(), vel.x, vel.y)
+      @bodies <<  Body.new("P#{i}", x, y, (1 + rand(base_radius)) * MPP, base_mass * rand(), vel.x, vel.y)
       body = @bodies.last
-      puts "BODY: #{i}: m:#{"%.5e" % body.mass} vel:#{"%.5e" % body.vel.x},#{"%.5e" % body.vel.y} pos:#{"%.5e" % body.pos.x},#{"%.5e" % body.pos.y}"
+      puts "BODY: #{body.name}: m:#{"%.5e" % body.mass} vel:#{"%.5e" % body.vel.x},#{"%.5e" % body.vel.y} pos:#{"%.5e" % body.pos.x},#{"%.5e" % body.pos.y}"
     end
   end
 
@@ -161,9 +174,7 @@ class NBody < Gosu::Window
         colliding.each do |pair|
           body1 = pair.first
           body2 = pair.last
-          @bodies.delete(body1)
-          @bodies.delete(body2)
-          @bodies << body1.collide_with(body2)
+          @bodies.delete(body1.collide_with(body2))
         end
       end
     end
@@ -181,8 +192,21 @@ class NBody < Gosu::Window
       @running = !@running
     elsif id == Gosu::KbC
       @offset = Vector.new @width / 2, @height / 2
+      @pin_planet = nil
+      @pin_barycenter = false
+    elsif id == Gosu::KbN
+      if !@pin_planet
+        @pin_planet = 1
+      else
+        @pin_planet += 1
+        if @pin_planet >= @bodies.length
+          @pin_planet = 0
+        end
+      end
+      @pin_barycenter = false
     elsif id == Gosu::KbB
       @pin_barycenter = !@pin_barycenter
+      @pin_planet = nil
     elsif id == Gosu::KbI
       @display = !@display
     end
@@ -235,18 +259,27 @@ class NBody < Gosu::Window
       end
     end
     bc = barycenter
-    bc_sc = world_to_screen(barycenter)
     if @pin_barycenter
       @offset.x = @offset.y = 0
-      @offset = Vector.new(@width/2,@height/2) + world_to_screen(bc - @bodies.first.pos)
+      @offset = Vector.new(@width/2,@height/2) - world_to_screen(bc)
+    elsif @pin_planet
+      old_offset = Vector.new @offset
+      @offset.x = @offset.y = 0
+      planet = @bodies[@pin_planet]
+      if planet
+        @offset = Vector.new(@width/2, @height/2) - world_to_screen(planet.pos)
+      else
+        @offset = old_offset
+      end
     end
-    draw_circle(bc_sc.x, bc_sc.y, 20 * @scale * MPP, Gosu::Color::RED)
+    bc_sc = world_to_screen(barycenter)
+    draw_circle(bc_sc.x, bc_sc.y, 10, Gosu::Color::RED)
     @bodies.each do |body|
       screen_pos = world_to_screen(body.pos)
       if screen_pos.x > @offset.x + 10000 || screen_pos.x < @offset.x - 10000 ||
          screen_pos.y > @offset.y + 10000 || screen_pos.x < @offset.y - 10000
         @bodies.delete(body)
-        puts "REMOVE: vel: #{"%.5e" % body.vel.x},#{"%.5e" % body.vel.y} pos: #{"%.5e" % body.pos.x},#{"%.5e" % body.pos.y}"
+        puts "REMOVE: #{body.name}: vel: #{"%.5e" % body.vel.x},#{"%.5e" % body.vel.y} pos: #{"%.5e" % body.pos.x},#{"%.5e" % body.pos.y}"
         next
       end
       draw_circle(screen_pos.x, screen_pos.y, body.radius * @scale / MPP, Gosu::Color::WHITE)
