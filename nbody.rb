@@ -52,7 +52,6 @@ class NBody < Gosu::Window
   CIRCLE_STEP = 10
   G = 6.674e-11
   MIN_RADIUS = 0.5
-  # meters per pixel
   attr_reader :bodies, :width, :height
   attr_accessor :energy
 
@@ -60,6 +59,7 @@ class NBody < Gosu::Window
     @width = width
     @height = height
     @energy = 0
+    # meters per pixel
     @mpp = 5e5
     @running = true
     @pin_barycenter = false
