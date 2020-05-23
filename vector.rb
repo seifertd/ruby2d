@@ -10,6 +10,9 @@ class Vector
       @x, @y, @z = coords
     end
   end
+  def to_s
+    "(#{[@x, @y, @z].compact.join(",")})"
+  end
   def magnitude
     Math.sqrt((@x || 0) ** 2 + (@y || 0) ** 2 + (@z || 0) ** 2)
   end

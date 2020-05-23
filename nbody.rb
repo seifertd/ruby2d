@@ -155,8 +155,8 @@ class NBody < Gosu::Window
         x = (-@width / 4 + rand(@width) / 2) * @mpp
         y = (-@height / 4 + rand(@height) / 2) * @mpp
       else
-        x = (-@width / 2 + rand(@width)) * @mpp
-        y = (-@height / 2 + rand(@height)) * @mpp
+        x = (-@width + rand(@width) * 2) * @mpp
+        y = (-@height + rand(@height) * 2) * @mpp
       end
       r = Vector.new(center.pos.x - x, center.pos.y - y)
       circular_orbit_vel =  Math.sqrt(G * center.mass / r.magnitude)
@@ -192,7 +192,6 @@ class NBody < Gosu::Window
 
           # Accel of body2 on body
           d = Math.sqrt((body.pos.x - body2.pos.x)**2 + (body.pos.y - body2.pos.y)**2)
-          acc_vect = Vector.new((body2.pos.x - body.pos.x) / d, (body2.pos.y - body.pos.y) / d)
           acc_vect = Vector.new((body2.pos.x - body.pos.x) / d, (body2.pos.y - body.pos.y) / d)
           body.acc.add! (acc_vect * (G * body2.mass / (d*d)))
         end
