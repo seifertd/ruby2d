@@ -10,7 +10,7 @@ set title: "Pan and Zoom", width: 1028, height: 768
 
 def text_box(text, options)
   text.each do |line|
-    Text.new line, options
+    Text.new line, **options
     options[:y] += 18
   end
 end

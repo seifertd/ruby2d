@@ -341,4 +341,4 @@ class NBody < Gosu::Window
   end
 end
 
-NBody.new(800,800).show
+NBody.new(600,600).show
